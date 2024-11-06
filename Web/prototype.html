@@ -1,0 +1,314 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>application component prototype</title>
+	<meta charset="utf-8">
+	<!--<link rel="stylesheet" href="http://js.arcgis.com/3.12/dijit/themes/claro/claro.css">-->
+	<style type="text/css">
+		html, body {
+			margin: 0;
+			padding: 0;
+		}
+
+		#_resultsListNode {
+			/*
+				width:368px;  351 after scroll
+				height: 300px;
+				*/
+		}
+
+		.options-button {
+			border-width: 0;
+		}
+
+		/* */
+		.field-street {
+		}
+
+		.field-city {
+			width: 100px;
+		}
+
+		.field-state {
+			width: 40px;
+		}
+
+		.field-zip {
+			width: 50px;
+		}
+
+		.wsrb-results-container {
+
+			border: 1px solid blue;
+			overflow: hidden;
+			position: absolute;
+			top: 40px;
+			left: 40px;
+		}
+
+		.wsrb-results-multiview {
+			height: 100%;
+			font-size: smaller;
+			width: 370px;
+			height: 328px;
+		}
+
+		.dgrid-row:hover {
+			background-color: #ddd;
+		}
+
+		/* Table view allows expanding/collapsing rows to show summary */
+
+		.table .expando {
+			/* style of area containing summary, expanded on click */
+			border-bottom: 1px solid #ccc !important;
+			padding: 0.7em 1em 0.5em 3em;
+			background: #fff;
+			background: -moz-linear-gradient(top, rgba(255,255,255,1) 24%, rgba(237,237,237,1) 100%);
+			background: -webkit-linear-gradient(top, rgba(255,255,255,1) 24%,rgba(237,237,237,1) 100%);
+			background: -ms-linear-gradient(top, rgba(255,255,255,1) 24%,rgba(237,237,237,1) 100%);
+			background: linear-gradient(top, rgba(255,255,255,1) 24%,rgba(237,237,237,1) 100%);
+			filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffffff', endColorstr='#ededed',GradientType=0 );
+		}
+
+		.table .collapsed .expando {
+			display: none;
+		}
+
+		/* styles for details view */
+
+		.details .dgrid-row {
+			clear: both;
+			min-height: 64px;
+			padding: 0.5em;
+		}
+
+		.details .icon {
+			float: left;
+		}
+	</style>
+</head>
+<body class="dbootstrap">
+
+	<div style="padding:20px;background-color:gray">
+		<input type="file" id="file_input" />
+		<!--<button id="table_view_button">Grid</button>
+		<button id="details_view_button">Summary</button>-->
+	</div>
+
+	<div style="position:relative">
+
+		<div id="results_container" class="wsrb-results-container">
+			<div id="results_multiview"></div>
+		</div>
+
+	</div>
+
+	<!--<div id="_resultsListNode">
+		<div id="grid" class="table"></div>
+	</div>-->
+
+	<script>
+
+		console.log("run::prototype")
+		var packagesUrl = window.location.pathname.replace(/\/[^/]+$/, '') + "/Scripts/"
+			, app = {}
+
+		console.log(packagesUrl)
+
+	</script>
+
+	<script src="http://js.arcgis.com/3.12compact/" data-dojo-config="async: true"></script>
+
+	<script type="text/javascript" defer>
+		console.log("main::prototype")
+
+		require(
+			{
+				packages:
+					[
+						{ name: "dbootstrap", location: packagesUrl + "dbootstrap" }
+						, { name: "wsrb", location: packagesUrl + "wsrb" }
+					]
+			},
+			[
+				'dojo/_base/declare', "dojo/_base/lang"
+				, "dojo/on", "dojo/dom", 'dojo/dom-construct', 'dojo/dom-class'
+				, "dojo/store/Memory", "dojo/store/Observable"
+				, "dgrid/OnDemandGrid", "dgrid/Selection"
+				, "wsrb/dijit/MultiView"
+				, "dbootstrap"
+			],
+			function (
+				declare, lang
+				, on, dom, domConstruct, domClass
+				, Memory, Observable
+				, OnDemandGrid, Selection
+				, MultiView
+				, dbootstrap
+			) {
+				console.log("initializing prototype")
+				var _fileNode = dom.byId("file_input")
+					, fileReader = new FileReader()
+					, expandoListener
+					, expandedNode
+					, renderers = {
+						details: function (obj) {
+							// function used for renderRow for details view (items w/ summary)
+							return domConstruct.create('div', {
+								innerHTML: '<div class="icon" style="background-image:url(resources/' +
+									obj.icon + '-64.png);">&nbsp;</div><div class="name">' +
+									obj.name + '</div><div class="summary">' + obj.summary() + '</div>'
+							});
+						},
+						table: function (obj) {
+							var div = domConstruct.create('div', { className: 'collapsed' });
+							div.appendChild(OnDemandGrid.prototype.renderRow.apply(this, arguments));
+							var summaryDiv = domConstruct.create('div', { className: 'expando' }, div);
+							summaryDiv.appendChild(document.createTextNode(obj.summary()));
+							return div;
+						}
+					}
+					, mem = new (declare([Memory]))({ data: [] })
+					, store = new Observable(mem)
+					, grid
+					, mv
+
+				mv = new MultiView({
+					store: store,
+					columns: {
+								street: { label: "Street", get: function (object) { return object.address.street } },
+								city: { label: "City", get: function(object) {return object.address.city} },
+								state: { label: "State", get: function (object) { return object.address.state } },
+								zip: { label: "Zip", get: function (object) { return object.address.zipCode } },
+					},
+					renderers: renderers
+				}, "results_multiview")
+				mv.startup()
+
+				on(_fileNode, "change", function (e) {
+					var f = _fileNode.files[0]
+					fileReader.readAsText(f);
+				})
+
+				on(fileReader, "load", function (e) {
+					var content = e.target.result
+						, lines = content.split(/\r\n|\n/)
+						, header, cellCount, i, line, data
+						, rowErrors = []
+						, results = []
+						, map = {
+							street: 0,
+							city: 1,
+							state: 2,
+							zip: 3,
+							source: Number.NaN,
+							propertyId: 4,
+							x: 5,
+							y: 6
+						}
+
+					header = lines[0].split(',')
+					cellCount = header.length
+
+					for (i = 1; i < lines.length; i++) {
+						line = lines[i]
+						data = line.split(",")
+						//TOOD: create "error list"
+						if (data.length == cellCount) {
+							//results.push(this._createResult(data, map))
+							obj = _createResult(data, map)
+							store.put(obj)
+						} else {
+							rowErrors.push(line)
+						}
+					}
+
+				})
+
+				// Instantiate grid
+				//grid = new (declare([OnDemandGrid]))({
+				//	store: store,
+				//	columns: {
+				//		street: { label: "Street", get: function (object) { return object.address.street } },
+				//		city: { label: "City", get: function(object) {return object.address.city} },
+				//		state: { label: "State", get: function (object) { return object.address.state } },
+				//		zip: { label: "Zip", get: function (object) { return object.address.zipCode } },
+				//	},
+				//	renderRow: renderers.table
+				//}, 'grid');
+				//grid.startup();
+
+				// listen for clicks to trigger expand/collapse in table view mode
+				//expandoListener = on.pausable(grid.domNode, '.dgrid-row:click', function (event) {
+				//	var node = grid.row(event).element;
+				//	var collapsed = domClass.contains(node, 'collapsed');
+
+				//	// toggle state of node which was clicked
+				//	domClass.toggle(node, 'collapsed', !collapsed);
+
+				//	// if clicked row wasn't expanded, collapse any previously-expanded row
+				//	collapsed && expandedNode && domClass.add(expandedNode, 'collapsed');
+
+				//	// if the row clicked was previously expanded, nothing is expanded now
+				//	expandedNode = collapsed ? node : null;
+				//});
+
+				function _createResult(data, map) {
+
+					var result = {
+						icon: "icon-style",
+
+						address: {
+							street: (map.street >= 0) ? data[map.street] : "",
+							city: (map.city >= 0) ? data[map.city] : "",
+							state: (map.state >= 0) ? data[map.state] : "",
+							zipCode: (map.zip >= 0) ? data[map.zip] : "",
+							source: (map.source >= 0) ? data[map.source] : ""
+						},
+
+						location: {
+							x: data[map.x],
+							y: data[map.y],
+							wkid: data[map.wkid]
+						},
+
+						propertyId: (map.propertyId >= 0) ? data[map.propertyId] : "",
+
+						summary: function () {
+							return "this is a summary"
+						}
+
+					}
+
+					return result
+				}
+
+				//function makeViewClickHandler(view) {
+				//	return function () {
+				//		// pause/resume click listener for expando in "table" view
+				//		expandoListener[view === 'table' ? 'resume' : 'pause']();
+				//		// reset expanded node for table view
+				//		expandedNode = null;
+				//		// update renderRow function
+				//		grid.renderRow = renderers[view];
+				//		// update class on grid domNode
+				//		domClass.replace(grid.domNode, view, 'table details');
+				//		// only show headers if we're in "table" view
+				//		grid.set('showHeader', view === 'table');
+				//		// force redraw of rows
+				//		grid.refresh();
+				//	};
+				//}
+
+				//on(dom.byId("table_view_button"), 'click', makeViewClickHandler('table'));
+				//on(dom.byId("details_view_button"), 'click', makeViewClickHandler('details'));
+
+				console.log("prototype initialized!")
+			});
+	</script>
+</body>
+
+
+
+</html>

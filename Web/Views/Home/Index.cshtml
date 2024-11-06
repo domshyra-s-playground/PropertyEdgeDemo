@@ -1,0 +1,22 @@
+﻿@section Css {
+	@* TODO: should the dijit load it's own css? Or all the css is compiled to a single file? *@
+	@* TODO: check if theme file exists since not required and if missing generates a 404? *@
+	<link rel="stylesheet" type="text/css" href="~/Scripts/wsrb/css/ApplicationFrame.css">
+	<link rel="stylesheet" type="text/css" href="~/Scripts/wsrb/css/wsrb-tools.css">
+	<link rel="stylesheet" type="text/css" href="~/Scripts/gcs/toc/css/TOC.css">
+	@* Apply theme last but still probably need !important in most cases *@
+	<link rel="stylesheet" type="text/css" href="@Url.Content(String.Format("~/Content/Themes/propertyedge.css"))">
+}
+
+<div id="Application_Frame"></div>
+
+@section Scripts {
+
+	<script>
+		window.appCode = "@ViewBag.ApplicationCode"
+		window.profileCode = "@ViewBag.ProfileCode"
+		window.profileName = "@ViewBag.ProfileName"
+	</script>
+
+	<script type="text/javascript" src="~/Scripts/run.js" defer></script>
+}
